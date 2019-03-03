@@ -1,0 +1,9 @@
+
+.banner-image {
+  background-image: url("http://localhost:8080/jobs/images/banner.png");
+  height: 50%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  position: relative;
+}
