@@ -5,12 +5,15 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"fmt"
-	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+
+	"github.com/bradfitz/slice"
+	"github.com/gorilla/mux"
+	_ "github.com/lib/pq"
 )
 
 var db *sql.DB
@@ -23,8 +26,26 @@ const (
 	dbname   = "postgres"
 )
 
-func loadDB() {
+type jobInfo struct {
+	JobID            string
+	SalaryRangeBegin float64
+	SalaryRangeEnd   float64
+	DivisionUnit     string
+	JobCategory      string
+}
+type jobScoreInfo struct {
+	SalaryRangeBegin float64
+	SalaryRangeEnd   float64
+	DivisionUnit     float64
+	JobCategory      float64
+}
 
+var jobScore map[string]jobScoreInfo
+var jobs []jobInfo
+
+func loadDB() {
+	jobScore = make(map[string]jobScoreInfo)
+	jobs = make([]jobInfo, 0)
 	r, err := db.Exec(`create table jobs (
 	Job_ID varchar,
 	Agency varchar,
@@ -49,12 +70,14 @@ func loadDB() {
 	fmt.Println(r)
 	if err != nil {
 		fmt.Println(err)
+		//	panic("fuck")
 	}
 
 	csvFile, _ := os.Open("NYC_Jobs.csv")
 	reader := csv.NewReader(bufio.NewReader(csvFile))
 
 	for {
+		var job jobInfo
 		baseStatement := "insert into public.jobs "
 		line, error := reader.Read()
 		if error == io.EOF {
@@ -64,6 +87,7 @@ func loadDB() {
 		}
 		cols := "(Job_ID "
 		vals := "('" + line[0] + "'"
+		job.JobID = line[0]
 		if line[1] != "" {
 			cols = cols + ", Agency"
 			vals = vals + ", '" + line[1] + "'"
@@ -91,6 +115,7 @@ func loadDB() {
 		if line[7] != "" {
 			cols = cols + ", Job_Category"
 			vals = vals + ", '" + line[7] + "'"
+			job.JobCategory = line[7]
 		}
 		if line[8] != "" {
 			cols = cols + ", Full_Part_Time_indicator"
@@ -99,10 +124,30 @@ func loadDB() {
 		if line[9] != "" {
 			cols = cols + ", Salary_Range_Begin"
 			vals = vals + ", " + line[9]
+			s, err := strconv.ParseFloat(line[9], 32)
+			if err != nil {
+				continue
+			}
+			if line[11] == "Hourly" {
+				s = s * 52 * 40
+			} else if line[11] == "Daily" {
+				s = s * 52 * 5
+			}
+			job.SalaryRangeBegin = s
 		}
 		if line[10] != "" {
 			cols = cols + ", Salary_Range_End"
 			vals = vals + ", " + line[10]
+			s, err := strconv.ParseFloat(line[10], 32)
+			if err != nil {
+				continue
+			}
+			if line[11] == "Hourly" {
+				s = s * 52 * 40
+			} else if line[11] == "Daily" {
+				s = s * 52 * 5
+			}
+			job.SalaryRangeEnd = s
 		}
 		if line[11] != "" {
 			cols = cols + ", Salary_Frequency"
@@ -115,6 +160,7 @@ func loadDB() {
 		if line[13] != "" {
 			cols = cols + ", Division_Unit"
 			vals = vals + ", '" + line[13] + "'"
+			job.DivisionUnit = line[13]
 		}
 		if line[14] != "" {
 			cols = cols + ", Job_Description"
@@ -135,9 +181,35 @@ func loadDB() {
 		cols = cols + ")"
 		vals = vals + ")"
 		statement := baseStatement + cols + " VALUES " + vals
-		db.Exec(statement)
+		r, err = db.Exec(statement)
+		if err != nil {
+			//	fmt.Println("error", err)
+			continue
+		}
+		jobs = append(jobs, job)
 	}
-
+}
+func linearEnd() {
+	slice.Sort(jobs[:], func(i, j int) bool {
+		return jobs[i].SalaryRangeEnd > jobs[j].SalaryRangeEnd
+	})
+	fmt.Println(jobs[0].SalaryRangeEnd, "--", jobs[len(jobs)-1].SalaryRangeEnd)
+	for _, val := range jobs {
+		var jobScoreVal jobScoreInfo
+		jobScoreVal.SalaryRangeEnd = (val.SalaryRangeEnd - jobs[len(jobs)-1].SalaryRangeEnd) / (jobs[0].SalaryRangeEnd - jobs[len(jobs)-1].SalaryRangeEnd)
+		jobScore[val.JobID] = jobScoreVal
+	}
+}
+func linearBegin() {
+	slice.Sort(jobs[:], func(i, j int) bool {
+		return jobs[i].SalaryRangeBegin > jobs[j].SalaryRangeBegin
+	})
+	fmt.Println(jobs[0].SalaryRangeBegin, "--", jobs[len(jobs)-1].SalaryRangeBegin)
+	for _, val := range jobs {
+		var jobScoreVal jobScoreInfo
+		jobScoreVal.SalaryRangeBegin = (val.SalaryRangeBegin - jobs[len(jobs)-1].SalaryRangeBegin) / (jobs[0].SalaryRangeBegin - jobs[len(jobs)-1].SalaryRangeBegin)
+		jobScore[val.JobID] = jobScoreVal
+	}
 }
 func main() {
 	var err error
@@ -150,7 +222,8 @@ func main() {
 	}
 	defer db.Close()
 	loadDB()
-
+	linearEnd()
+	linearBegin()
 	fmt.Println("Connected to database")
 	r := mux.NewRouter()
 	r.PathPrefix("/jobs/").Handler(http.StripPrefix("/jobs/", http.FileServer(http.Dir("./jobs"))))
