@@ -4,17 +4,20 @@ import (
 	"bufio"
 	"database/sql"
 	"encoding/csv"
-	"fmt"
+	"encoding/json"
+		"fmt"
+		"strings"
+	"github.com/bradfitz/slice"
+	"github.com/gorilla/mux"
+	_ "github.com/lib/pq"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-
-	"github.com/bradfitz/slice"
-	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
 )
+
 
 var db *sql.DB
 
@@ -28,22 +31,69 @@ const (
 
 type jobInfo struct {
 	JobID            string
+	BusTitle string
 	SalaryRangeBegin float64
 	SalaryRangeEnd   float64
 	DivisionUnit     string
 	JobCategory      string
 }
 type jobScoreInfo struct {
+	JobID string
+	BusTitle string
 	SalaryRangeBegin float64
 	SalaryRangeEnd   float64
 	DivisionUnit     float64
 	JobCategory      float64
 }
+type category struct {
+	JobCategory string  `json:"category"`
+	Rank        float64 `json:"rank"`
+	Score       float64
+}
+type evalStruct struct {
+	JobCategories []category `json:"categories"`
+	Divisions     []category `json:"divisions"`
+}
+type catsStruct struct {
+	JobCategories []string `json:"categories"`
+	Divisions     []string `json:"divisions"`
+}
 
 var jobScore map[string]jobScoreInfo
 var jobs []jobInfo
-
+var jobCategories []string
+var divisions []string
+func getCat(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("got request")
+	var cat catsStruct
+	cat.JobCategories = jobCategories
+	cat.Divisions = divisions
+	resp, _ := json.Marshal(cat)
+	fmt.Fprint(w,string(resp))
+}
+func ScoreEval(w http.ResponseWriter, r *http.Request) {
+	body, _ := ioutil.ReadAll(r.Body)
+	var eval evalStruct
+	 json.Unmarshal(body, &eval)
+	fmt.Println(string(body))
+	fmt.Println(eval.JobCategories)
+	linearCat("division", eval.Divisions)
+	linearCat("jobcat", eval.JobCategories)
+	resp,_ := json.Marshal(jobScore)
+	fmt.Println("scoring")
+	fmt.Fprint(w,string(resp))
+}
+func isUnique( val string, arry []string) bool{
+	for _,x := range arry{
+		if val == x{
+			return false
+		}
+	}
+	return true
+}
 func loadDB() {
+	jobCategories = make([]string,0)
+	divisions = make([]string,0)
 	jobScore = make(map[string]jobScoreInfo)
 	jobs = make([]jobInfo, 0)
 	r, err := db.Exec(`create table jobs (
@@ -99,6 +149,7 @@ func loadDB() {
 		if line[3] != "" {
 			cols = cols + ", Business_Title"
 			vals = vals + ", '" + line[3] + "'"
+			job.BusTitle  =  line[3]
 		}
 		if line[4] != "" {
 			cols = cols + ", Civil_Service_Title"
@@ -115,7 +166,13 @@ func loadDB() {
 		if line[7] != "" {
 			cols = cols + ", Job_Category"
 			vals = vals + ", '" + line[7] + "'"
+			//strings.SplitAfter("a,b,c", ",")
+			line[7]= strings.Trim(line[7],`"`)
+			line[7]= strings.Replace(line[7],"&","and",-1)
 			job.JobCategory = line[7]
+			if isUnique(line[7],jobCategories) {
+				jobCategories = append(jobCategories,line[7])
+			}
 		}
 		if line[8] != "" {
 			cols = cols + ", Full_Part_Time_indicator"
@@ -160,7 +217,12 @@ func loadDB() {
 		if line[13] != "" {
 			cols = cols + ", Division_Unit"
 			vals = vals + ", '" + line[13] + "'"
+			line[13]= strings.Trim(line[13],`"`)
+			line[13]= strings.Replace(line[13],"&","and",-1)
 			job.DivisionUnit = line[13]
+			if isUnique(line[13],divisions) {
+				divisions = append(divisions,line[13])
+			}
 		}
 		if line[14] != "" {
 			cols = cols + ", Job_Description"
@@ -188,14 +250,57 @@ func loadDB() {
 		}
 		jobs = append(jobs, job)
 	}
+	fmt.Println(len(jobCategories),len(divisions))
+}
+func linearCat(typeOfVal string, cat []category) {
+	for i := range cat {
+		if cat[i].Rank == 0 {
+			cat[i].Rank = 1
+		}
+		cat[i].Score = (cat[i].Rank - 1) / (7 - 1)
+	}
+	for _, job := range jobs {
+		var score float64
+		var tempScore jobScoreInfo
+		var found bool
+		if typeOfVal == "division" {
+			for _, catVal := range cat {
+				if job.DivisionUnit == catVal.JobCategory {
+					found = true
+					score = catVal.Score
+				}
+			}
+			if !found{
+				score = 0
+			}
+			tempScore = jobScore[job.JobID]
+			tempScore.DivisionUnit = score
+			jobScore[job.JobID] = tempScore
+		} else {
+			for _, catVal := range cat {
+				if job.JobCategory == catVal.JobCategory {
+					found = true
+					score = catVal.Score
+				}
+			}
+			if !found{
+				score = 1
+			}
+			tempScore = jobScore[job.JobID]
+			tempScore.JobCategory = score
+			jobScore[job.JobID] = tempScore
+		}
+
+	}
 }
 func linearEnd() {
 	slice.Sort(jobs[:], func(i, j int) bool {
 		return jobs[i].SalaryRangeEnd > jobs[j].SalaryRangeEnd
 	})
-	fmt.Println(jobs[0].SalaryRangeEnd, "--", jobs[len(jobs)-1].SalaryRangeEnd)
+	//fmt.Println(jobs[0].SalaryRangeEnd, "--", jobs[len(jobs)-1].SalaryRangeEnd)
 	for _, val := range jobs {
 		var jobScoreVal jobScoreInfo
+		jobScoreVal.BusTitle = val.BusTitle
 		jobScoreVal.SalaryRangeEnd = (val.SalaryRangeEnd - jobs[len(jobs)-1].SalaryRangeEnd) / (jobs[0].SalaryRangeEnd - jobs[len(jobs)-1].SalaryRangeEnd)
 		jobScore[val.JobID] = jobScoreVal
 	}
@@ -204,9 +309,10 @@ func linearBegin() {
 	slice.Sort(jobs[:], func(i, j int) bool {
 		return jobs[i].SalaryRangeBegin > jobs[j].SalaryRangeBegin
 	})
-	fmt.Println(jobs[0].SalaryRangeBegin, "--", jobs[len(jobs)-1].SalaryRangeBegin)
+	//fmt.Println(jobs[0].SalaryRangeBegin, "--", jobs[len(jobs)-1].SalaryRangeBegin)
 	for _, val := range jobs {
 		var jobScoreVal jobScoreInfo
+		jobScoreVal =	jobScore[val.JobID]
 		jobScoreVal.SalaryRangeBegin = (val.SalaryRangeBegin - jobs[len(jobs)-1].SalaryRangeBegin) / (jobs[0].SalaryRangeBegin - jobs[len(jobs)-1].SalaryRangeBegin)
 		jobScore[val.JobID] = jobScoreVal
 	}
@@ -226,6 +332,8 @@ func main() {
 	linearBegin()
 	fmt.Println("Connected to database")
 	r := mux.NewRouter()
+	r.HandleFunc("/ScoreEval", ScoreEval).Methods("POST")
+	r.HandleFunc("/cat", getCat).Methods("GET")
 	r.PathPrefix("/jobs/").Handler(http.StripPrefix("/jobs/", http.FileServer(http.Dir("./jobs"))))
 	fmt.Println("Started server")
 	http.ListenAndServe(":8080", r)
