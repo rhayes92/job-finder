@@ -72,6 +72,20 @@ var jobs []jobInfo
 
 var jobCategories []string
 var divisions []string
+func getJobInfo(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("got request")
+	var job jobInfo
+	keys, _ := r.URL.Query()["id"]
+			fmt.Println(keys[0])
+	for i := range jobs{
+		if jobs[i].JobID == keys[0]{
+			job = jobs[i]
+
+		}
+	}
+	resp, _ := json.Marshal(job)
+	fmt.Fprint(w,string(resp))
+}
 func getCat(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("got request")
 	var cat catsStruct
@@ -400,6 +414,7 @@ func main() {
 	fmt.Println("Connected to database")
 	r := mux.NewRouter()
 	r.HandleFunc("/ScoreEval", ScoreEval).Methods("POST")
+	r.HandleFunc("/info", getJobInfo).Methods("GET")
 	r.HandleFunc("/cat", getCat).Methods("GET")
 	r.PathPrefix("/jobs/").Handler(http.StripPrefix("/jobs/", http.FileServer(http.Dir("./jobs"))))
 	fmt.Println("Started server")

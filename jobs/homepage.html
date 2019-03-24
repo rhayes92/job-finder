@@ -39,8 +39,9 @@
 <script src="http://localhost:8080/jobs/sorttable.js"></script>
 </head>
 <body onLoad="getCat();">
-<div class="container-fluid">
+<div id="container" class="container-fluid">
       <div class="row banner-image" style="height:75px"> </div>
+      <div  class="row"> <label>Weight Ranking:</label></div>
       <div  class="row">
         <div class="col-lg-3">
           <label for="category">Job Category: </label>
@@ -61,14 +62,16 @@
       </div>
       <div  class="row">
         <div id="catCol" class="col-lg-6">
-          <input id="catAdd" type="button"/>
+          <label for="catCol">Add Job Category Rating: </label>
+          <input id="catAdd" type="button" value="Add"/>
         </div>
         <div id="divCol"class="col-lg-6">
-          <input id="divisionAdd"  type="button"/>
+          <label for="catCol">Add Division Rating: </label>
+          <input id="divisionAdd"  type="button"  value="Add"/>
         </div>
       </div>
       <div  class="row">
-          <input id="eval"  type="button"/>
+          <input id="eval"  type="button" value="Evaluate"/>
       </div>
       <div  class="row">
           <table id="result"  class="sortable">

@@ -13,7 +13,6 @@ function getCat() {
       //console.log(this.responseText);
       var  CatAndDiv = JSON.parse( this.responseText );
       jsonCat = CatAndDiv
-      console.log(jsonCat.categories)
     //  auto()
     }
   };
@@ -45,6 +44,13 @@ jQuery(document).ready(function () {
      catRank =$('select[name=catSelect]')
      cats = []
      for(var i = 0; i <cat.length; i++){
+       if (cat[i].value ==""){
+         i++
+       }
+       if (!jsonCat.categories.includes(cat[i].value)){
+         alert(cat[i].value+" is invalid\nCategory must be in database(use autocomplete)")
+         return
+       }
        cats.push({category:cat[i].value, rank:parseFloat(catRank[i].value)})
      }
 
@@ -52,10 +58,33 @@ jQuery(document).ready(function () {
      divRank =$('select[name=divSelect]')
      divs =[]
      for(var i = 0; i <div.length; i++){
+       if (div[i].value ==""){
+         i++
+       }
+       if (!jsonCat.divisions.includes(div[i].value)){
+         alert(div[i].value+" is invalid\nDivisions must be in database(use autocomplete)")
+         return
+       }
        divs.push({category:div[i].value, rank:parseFloat(divRank[i].value)})
      }
 
     weight  = {begin:parseFloat($('#begin').val()), end:parseFloat($('#end').val()), divisions:parseFloat($('#divisions').val()), category:parseFloat($('#category').val())}
+    //if (weight.begin != 1 && weight.end != 1  && weight.category != 1 && weight.divisions != 1){
+    var weightCount = [0,0,0,0]
+    for(var i = 1; i < 5; i++){
+      for(var index in weight) {
+        if (weight[index] == i) {
+          weightCount[i-1]++;
+        }
+      }
+    }
+    for(var i = 0; i < 3; i++){
+       console.log(weightCount)
+        if (weightCount[i] < weightCount[i+1]){
+          alert("Weights must go in acsending order \n(example: can't have all weights equal 4 they must all equal 1)");
+          return
+        }
+    }
     var eval = {categories:cats, divisions:divs, weight:weight};
 
     //
@@ -80,7 +109,7 @@ jQuery(document).ready(function () {
           '<td class="item">'+ jsonEval[index].DivisionUnit + '</td>'+
           '<td class="item">'+ jsonEval[index].SalaryRangeEnd + '</td>'+
           '<td class="item">'+ jsonEval[index].SalaryRangeBegin + '</td>'+
-          '<td class="item"> <input type="button"  onclick="myFunction('+index+')"/></td> </tr>'
+          '<td class="item"> <input type="button" id="'+index+'" data-href="#entry1"  onclick="getInfo('+index+')"/></td> </tr>'
          );
         //console.log(jsonEval[index])
        }
@@ -91,5 +120,25 @@ jQuery(document).ready(function () {
   console.log(eval)
   xhr.send(data);
   });
-
 });
+function getInfo(id){
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      console.log(this.responseText);
+      var  info = JSON.parse( this.responseText );
+      popup = "Job ID: - "+info.JobID+"\n"+
+      "Title: - "+info.BusTitle+"\n"+
+      "Job Category: - "+info.JobCategory+"\n"+
+      "Division: - "+info.DivisionUnit+"\n"+
+      "Salary Cap: $"+info.SalaryRangeEnd+"\n"+
+      "Starting Salary:  $"+info.SalaryRangeBegin+"\n"
+      alert( popup)
+
+
+    //  auto()
+    }
+  };
+  xhttp.open("GET", "http://localhost:8080/info?id="+id);
+  xhttp.send();
+}
