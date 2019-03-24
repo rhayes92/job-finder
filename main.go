@@ -38,6 +38,7 @@ type jobInfo struct {
 	JobCategory      string
 }
 type jobScoreInfo struct {
+	Score float64
 	JobID string
 	BusTitle string
 	SalaryRangeBegin float64
@@ -50,9 +51,16 @@ type category struct {
 	Rank        float64 `json:"rank"`
 	Score       float64
 }
+type Weights struct {
+	JobCategories float64  `json:"category"`
+	Divisions float64  `json:"divisions"`
+	End float64  `json:"end"`
+	Begin float64  `json:"begin"`
+}
 type evalStruct struct {
 	JobCategories []category `json:"categories"`
 	Divisions     []category `json:"divisions"`
+	Weight Weights `json:"weight"`
 }
 type catsStruct struct {
 	JobCategories []string `json:"categories"`
@@ -61,6 +69,7 @@ type catsStruct struct {
 
 var jobScore map[string]jobScoreInfo
 var jobs []jobInfo
+
 var jobCategories []string
 var divisions []string
 func getCat(w http.ResponseWriter, r *http.Request) {
@@ -71,17 +80,75 @@ func getCat(w http.ResponseWriter, r *http.Request) {
 	resp, _ := json.Marshal(cat)
 	fmt.Fprint(w,string(resp))
 }
-func ScoreEval(w http.ResponseWriter, r *http.Request) {
+func ScoreEval(w http.ResponseWriter, r *http.Request){
 	body, _ := ioutil.ReadAll(r.Body)
+		fmt.Println("tmep",string(body))
 	var eval evalStruct
 	 json.Unmarshal(body, &eval)
-	fmt.Println(string(body))
+//	fmt.Println(eval)
 	fmt.Println(eval.JobCategories)
 	linearCat("division", eval.Divisions)
 	linearCat("jobcat", eval.JobCategories)
-	resp,_ := json.Marshal(jobScore)
+	results := calcScore(eval.Weight)
+	resp,_ := json.Marshal(results)
 	fmt.Println("scoring")
 	fmt.Fprint(w,string(resp))
+}
+func calcScore(w Weights) map[string]jobScoreInfo{
+	var weight [][]float64
+	weight = make([][]float64,4)
+	for i :=0; i < 4; i++{
+		weight[i] =make([]float64,4)
+	}
+	for  i := range weight{
+		var total float64
+		if w.JobCategories <= float64(i) +1.0{
+			weight[i][0]= 1.0
+		}
+		if w.Divisions <= float64(i) +1.0{
+			weight[i][1]= 1.0
+		}
+		if w.End <= float64(i) +1.0{
+			weight[i][2]= 1.0
+		}
+		if w.Begin <= float64(i) +1.0{
+			weight[i][3]= 1.0
+		}
+		for j := range weight[i]{
+			total = total +  weight[i][j]
+		}
+		if total != 0{
+		 weight[i][0]= weight[i][0]/total
+		 weight[i][1]= weight[i][1]/total
+		 weight[i][2]= weight[i][2]/total
+		 weight[i][3]= weight[i][3]/total
+	 }
+		 fmt.Println("weight",weight)
+	}
+		w.JobCategories =  (weight[0][0] +  weight[1][0] +  weight[2][0] +  weight[3][0])/4
+		w.Divisions =  (weight[0][1] +  weight[1][1] +  weight[2][1]+  weight[3][1])/4
+		w.End =  (weight[0][2] +  weight[1][2] +  weight[2][2]+  weight[3][2])/4
+		w.Begin =  (weight[0][3] +  weight[1][3] +  weight[2][3]+  weight[3][3])/4
+		fmt.Println(w)
+		tempArray := make([]jobScoreInfo,0)
+		for key := range jobScore {
+			job := jobScore[key]
+			job.Score = job.SalaryRangeBegin * w.Begin + job.SalaryRangeEnd *  w.End  + job.DivisionUnit *	w.Divisions + job.JobCategory *	w.JobCategories
+			job.JobID = key
+			jobScore[key] = job
+			tempArray = append(tempArray,job)
+		}
+		slice.Sort(tempArray[:], func(i, j int) bool {
+			return tempArray[i].Score > tempArray[j].Score
+		})
+		 tempScore := make(map[string]jobScoreInfo)
+		for j := range tempArray{
+			tempScore[tempArray[j].JobID]	= tempArray[j]
+			if j > 9 {
+				break
+			}
+		}
+		return tempScore
 }
 func isUnique( val string, arry []string) bool{
 	for _,x := range arry{
@@ -284,7 +351,7 @@ func linearCat(typeOfVal string, cat []category) {
 				}
 			}
 			if !found{
-				score = 1
+				score = 0
 			}
 			tempScore = jobScore[job.JobID]
 			tempScore.JobCategory = score

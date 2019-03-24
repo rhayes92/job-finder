@@ -2,7 +2,8 @@
 //
 //
 // });
-var jsonVal = ""
+var jsonCat = ""
+var jsonEval = ""
 var catVal = 0
 var divVal = 0
 function getCat() {
@@ -11,8 +12,8 @@ function getCat() {
     if (this.readyState == 4 && this.status == 200) {
       //console.log(this.responseText);
       var  CatAndDiv = JSON.parse( this.responseText );
-      jsonVal = CatAndDiv
-      console.log(jsonVal.categories)
+      jsonCat = CatAndDiv
+      console.log(jsonCat.categories)
     //  auto()
     }
   };
@@ -22,8 +23,8 @@ function getCat() {
 
 function auto() {
   $( function() {
-    $(".autocomplete1").autocomplete({source:jsonVal.categories});
-    $(".autocomplete2").autocomplete({source:jsonVal.divisions});
+    $(".autocomplete1").autocomplete({source:jsonCat.categories});
+    $(".autocomplete2").autocomplete({source:jsonCat.divisions});
    } );
 }
 
@@ -39,11 +40,7 @@ jQuery(document).ready(function () {
     divVal = divVal + 1
     auto();
   });
-
   $( "#eval" ).click(function() {
-
-
-
      cat =$('input[name=catText]')
      catRank =$('select[name=catSelect]')
      cats = []
@@ -57,7 +54,9 @@ jQuery(document).ready(function () {
      for(var i = 0; i <div.length; i++){
        divs.push({category:div[i].value, rank:parseFloat(divRank[i].value)})
      }
-    var eval = {categories:cats, divisions:divs};
+
+    weight  = {begin:parseFloat($('#begin').val()), end:parseFloat($('#end').val()), divisions:parseFloat($('#divisions').val()), category:parseFloat($('#category').val())}
+    var eval = {categories:cats, divisions:divs, weight:weight};
 
     //
     var xhr = new XMLHttpRequest();
@@ -67,11 +66,30 @@ jQuery(document).ready(function () {
     xhr.onreadystatechange = function () {
     if (xhr.readyState === 4 && xhr.status === 200) {
         var json = JSON.parse(xhr.responseText);
-        console.log(json)
-
+        //console.log(json)
+        $("#result").find("img").remove();
+        $("#evals").find("tr").remove();
+        jsonEval = json;
+        for(var index in jsonEval) {
+         $( "#evals" ).append(
+           '<tr>'+
+          '<td class="item">'+ index + '</td>'+
+          '<td class="item">'+ jsonEval[index].Score + '</td>'+
+          '<td class="item">'+ jsonEval[index].BusTitle + '</td>'+
+          '<td class="item">'+ jsonEval[index].JobCategory + '</td>'+
+          '<td class="item">'+ jsonEval[index].DivisionUnit + '</td>'+
+          '<td class="item">'+ jsonEval[index].SalaryRangeEnd + '</td>'+
+          '<td class="item">'+ jsonEval[index].SalaryRangeBegin + '</td>'+
+          '<td class="item"> <input type="button"  onclick="myFunction('+index+')"/></td> </tr>'
+         );
+        //console.log(jsonEval[index])
+       }
+      $("#result").addSortWidget();
     }
-  };
+    };
   var data = JSON.stringify(eval);
+  console.log(eval)
   xhr.send(data);
   });
+
 });

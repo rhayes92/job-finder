@@ -4,50 +4,61 @@
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
 <link rel="stylesheet" href="http://localhost:8080/jobs/common.css">
 <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<style>
+  #result {
+    font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+  }
 
+  #result td, #result th {
+    border: 1px solid #ddd;
+    padding: 8px;
+  }
+
+  #result tr:nth-child(even){background-color: #f2f2f2;}
+
+  #result tr:hover {background-color: #ddd;}
+
+  #result th {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    text-align: left;
+    background-color: #4CAF50;
+    color: white;
+  }
+</style>
 <!-- jQuery library -->
 <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
 <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-
+<script src="https://www.w3schools.com/lib/w3.js"></script>
 <!-- Latest compiled JavaScript -->
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
 <!-- jQuery library -->
 <script src="http://localhost:8080/jobs/funcs.js"></script>
-<script>
-$( function() {
-  var availableTags = [
-    "ActionScript",
-    "AppleScript",
-    "Asp",
-    "BASIC",
-    "C",
-    "C++",
-    "Clojure",
-    "COBOL",
-    "ColdFusion",
-    "Erlang",
-    "Fortran",
-    "Groovy",
-    "Haskell",
-    "Java",
-    "JavaScript",
-    "Lisp",
-    "Perl",
-    "PHP",
-    "Python",
-    "Ruby",
-    "Scala",
-    "Scheme"
-  ];
-  $( ".autocomplete1" ).autocomplete({
-    source: availableTags
-  });
-} );
-</script>
+<script src="http://localhost:8080/jobs/sorttable.js"></script>
 </head>
 <body onLoad="getCat();">
 <div class="container-fluid">
       <div class="row banner-image" style="height:75px"> </div>
+      <div  class="row">
+        <div class="col-lg-3">
+          <label for="category">Job Category: </label>
+          <select id="category">  <option value="1">1</option>  <option value="2">2</option>  <option value="3">3</option>  <option value="4">4</option> </select>
+        </div>
+        <div class="col-lg-3">
+          <label for="divisions">Division: </label>
+          <select id="divisions">  <option value="1">1</option>  <option value="2">2</option>  <option value="3">3</option>  <option value="4">4</option> </select>
+        </div>
+        <div class="col-lg-3">
+            <label for="end">Ending Salary: </label>
+            <select id="end">  <option value="1">1</option>  <option value="2">2</option>  <option value="3">3</option>  <option value="4">4</option> </select>
+        </div>
+        <div class="col-lg-3">
+          <label for="begin">Beginning Salary: </label>
+          <select id="begin">  <option value="1">1</option>  <option value="2">2</option>  <option value="3">3</option>  <option value="4">4</option> </select>
+        </div>
+      </div>
       <div  class="row">
         <div id="catCol" class="col-lg-6">
           <input id="catAdd" type="button"/>
@@ -58,6 +69,25 @@ $( function() {
       </div>
       <div  class="row">
           <input id="eval"  type="button"/>
+      </div>
+      <div  class="row">
+          <table id="result"  class="sortable">
+            <thead>
+              <tr>
+             <tr>
+              <th>Job ID</th>
+              <th>Score</th>
+              <th>Job Title</th>
+              <th>Job Category</th>
+              <th>Division</th>
+              <th>Ending Salary</th>
+              <th>Beginning Salary</th>
+              <th>Details</th>
+            </tr>
+             </thead>
+            <tbody id="evals">
+            </tbody>
+          </table>
       </div>
 </div>
 </body>
